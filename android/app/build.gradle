@@ -1,0 +1,76 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+project.ext.envConfigFiles = [
+    debug: ".env",
+    release: ".env"
+]
+
+apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
+
+def enableProguardInReleaseBuilds = false
+def jscFlavor = 'org.webkit:android-jsc:+'
+
+android {
+    ndkVersion rootProject.ext.ndkVersion
+
+    compileSdkVersion rootProject.ext.compileSdkVersion
+
+    namespace "com.nairabankmobile"
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
+    kotlinOptions {
+        jvmTarget = '17'
+        freeCompilerArgs += ['-Xskip-metadata-version-check']
+    }
+    defaultConfig {
+        applicationId "com.nairabankmobile"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        
+        // Load environment variables from .env file
+        resValue "string", "TRULYYOU_API_URL", project.env.get("TRULYYOU_API_URL", "http://10.0.2.2:3003")
+        resValue "string", "TRULYYOU_AUTH_APP_ID", project.env.get("TRULYYOU_AUTH_APP_ID", "")
+        resValue "string", "TRULYYOU_BACKEND_API_URL", project.env.get("TRULYYOU_BACKEND_API_URL", "https://personalbanking-api.demo.truly.you")
+    }
+    signingConfigs {
+        debug {
+            storeFile file(project.findProperty('RELEASE_STORE_FILE') ?: 'debug.keystore')
+            storePassword project.findProperty('RELEASE_STORE_PASSWORD') ?: 'android'
+            keyAlias project.findProperty('RELEASE_KEY_ALIAS') ?: 'androiddebugkey'
+            keyPassword project.findProperty('RELEASE_KEY_PASSWORD') ?: 'android'
+        }
+    }
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+dependencies {
+    implementation("com.facebook.react:react-android")
+    implementation("com.facebook.react:flipper-integration")
+    implementation project(':react-native-config')
+    implementation project(':react-native-passkey')
+
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        implementation jscFlavor
+    }
+}
+
+apply from: file("../../node_modules/react-native/node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
