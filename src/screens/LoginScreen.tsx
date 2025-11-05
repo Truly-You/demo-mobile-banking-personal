@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from 'react-native-config';
-import { TrulyYouReactNativeSDK } from '../sdk/TrulyYouReactNativeSDK';
+import { TrulyYouReactNativeSDK } from '@truly-you/react-native-sdk';
 import { configService } from '../services/ConfigService';
 
 interface LoginScreenProps {
