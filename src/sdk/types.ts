@@ -1,9 +1,9 @@
 export interface TrulyYouReactNativeSDKConfig {
-  apiUrl?: string
-  frontendUrl?: string
-  authAppId?: string
+  apiUrl: string // Required: SDK backend URL
+  authAppId: string // Required: Auth app ID
   keyId: string // Required: keyId from passkey stored on device
-  deepLinkScheme?: string // Optional: Deep link scheme for enrollment callback (e.g., 'nairabankapp')
+  frontendUrl?: string // Optional: SDK frontend URL (will be fetched from backend if not provided)
+  deepLinkScheme?: string // Optional: Deep link scheme for enrollment callback (will be fetched from backend if not provided)
 }
 
 export interface FetchOptions {

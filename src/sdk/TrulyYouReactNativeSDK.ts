@@ -2,25 +2,128 @@ import { TrulyYouReactNativeSDKConfig, FetchOptions, SigningResult, FetchResult 
 import { Passkey } from 'react-native-passkey'
 import { Linking } from 'react-native'
 
+interface SDKBackendConfig {
+  frontendUrl: string
+  deeplink: string
+}
+
 export class TrulyYouReactNativeSDK {
   private config: TrulyYouReactNativeSDKConfig
   private apiUrl: string
-  private frontendUrl: string
+  private frontendUrl: string | undefined
   private authAppId: string | undefined
   private keyId: string
-  private deepLinkScheme: string
+  private deepLinkScheme: string | undefined
+  private backendConfig: SDKBackendConfig | null = null
+  private configPromise: Promise<SDKBackendConfig> | null = null
 
   constructor(config: TrulyYouReactNativeSDKConfig) {
     this.config = config
-    this.apiUrl = config.apiUrl || 'http://localhost:3003'
-    this.frontendUrl = config.frontendUrl || 'https://dev.ng.truly.you'
+    this.apiUrl = config.apiUrl
+    this.frontendUrl = config.frontendUrl  // Optional - will fetch if not provided
     this.authAppId = config.authAppId
     this.keyId = config.keyId
-    this.deepLinkScheme = config.deepLinkScheme || 'nairabankapp'
+    this.deepLinkScheme = config.deepLinkScheme  // Optional - will fetch if not provided
 
+    if (!this.apiUrl) {
+      throw new Error('apiUrl is required for TrulyYouReactNativeSDK')
+    }
     if (!this.keyId) {
       throw new Error('keyId is required for TrulyYouReactNativeSDK')
     }
+    if (!this.authAppId) {
+      throw new Error('authAppId is required for TrulyYouReactNativeSDK')
+    }
+  }
+
+  /**
+   * Fetch config from SDK backend
+   * Fetches frontendUrl and deeplink if not provided in constructor
+   */
+  private async fetchBackendConfig(): Promise<SDKBackendConfig> {
+    // Return cached config if available
+    if (this.backendConfig) {
+      return this.backendConfig
+    }
+
+    // If already fetching, wait for that promise
+    if (this.configPromise) {
+      return this.configPromise
+    }
+
+    this.configPromise = this._doFetchConfig()
+    try {
+      const config = await this.configPromise
+      return config
+    } finally {
+      this.configPromise = null
+    }
+  }
+
+  private async _doFetchConfig(): Promise<SDKBackendConfig> {
+    try {
+      console.log('[ReactNativeSDK]: Fetching config from backend...')
+      const response = await fetch(`${this.apiUrl}/api/config`)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch config: ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      
+      if (!data.success || !data.data) {
+        throw new Error('Invalid config response from backend')
+      }
+
+      this.backendConfig = {
+        frontendUrl: data.data.urls?.sdkFrontendUrl,
+        deeplink: data.data.interface?.deeplink
+      }
+
+      console.log('[ReactNativeSDK]: Config fetched:', this.backendConfig)
+      return this.backendConfig
+    } catch (error) {
+      console.error('[ReactNativeSDK]: Failed to fetch config:', error)
+      throw new Error('Unable to fetch configuration from SDK backend. Please check your apiUrl.')
+    }
+  }
+
+  /**
+   * Get frontend URL - from constructor or backend config
+   */
+  private async getFrontendUrl(): Promise<string> {
+    if (this.frontendUrl) {
+      return this.frontendUrl
+    }
+
+    const config = await this.fetchBackendConfig()
+    if (!config.frontendUrl) {
+      throw new Error('Frontend URL not configured. Please set frontendUrl in constructor or configure in backend.')
+    }
+    
+    return config.frontendUrl
+  }
+
+  /**
+   * Get deep link scheme - from constructor or backend config
+   */
+  private async getDeepLinkScheme(): Promise<string> {
+    if (this.deepLinkScheme) {
+      return this.deepLinkScheme
+    }
+
+    const config = await this.fetchBackendConfig()
+    if (!config.deeplink) {
+      throw new Error('Deep link scheme not configured. Please set deepLinkScheme in constructor or configure in backend.')
+    }
+    
+    // Extract scheme from deeplink (e.g. "nairabankapp://enrollment-success" -> "nairabankapp")
+    const match = config.deeplink.match(/^([a-z0-9]+):\/\//)
+    if (!match) {
+      throw new Error('Invalid deeplink format in backend config')
+    }
+    
+    return match[1]
   }
 
   /**
@@ -35,7 +138,13 @@ export class TrulyYouReactNativeSDK {
     console.log('[ReactNativeSDK]: Starting enrollment flow')
 
     try {
-      // Step 1: Get app to retrieve authFlowId
+      // Step 1: Get frontend URL and deep link scheme (from config or backend)
+      const frontendUrl = await this.getFrontendUrl()
+      const deepLinkScheme = await this.getDeepLinkScheme()
+      console.log('[ReactNativeSDK]: Using frontendUrl:', frontendUrl)
+      console.log('[ReactNativeSDK]: Using deepLinkScheme:', deepLinkScheme)
+
+      // Step 2: Get app to retrieve authFlowId
       const appResponse = await fetch(`${this.apiUrl}/api/apps/${this.authAppId}`)
       
       if (!appResponse.ok) {
@@ -51,10 +160,10 @@ export class TrulyYouReactNativeSDK {
 
       console.log('[ReactNativeSDK]: App loaded, authFlowId:', app.authFlowId)
 
-      // Step 2: Generate a clientId for this session
+      // Step 3: Generate a clientId for this session
       const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-      // Step 3: Create session via SDK backend
+      // Step 4: Create session via SDK backend
       const sessionResponse = await fetch(`${this.apiUrl}/api/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,8 +184,8 @@ export class TrulyYouReactNativeSDK {
 
       console.log('[ReactNativeSDK]: Session created:', sessionId)
 
-      // Step 4: Build enrollment URL with deep link parameters
-      const returnUrl = `${this.deepLinkScheme}://enrollment-success`
+      // Step 5: Build enrollment URL with deep link parameters
+      const returnUrl = `${deepLinkScheme}://enrollment-success`
       const enrollUrlParams = new URLSearchParams({
         authAppId: this.authAppId,
         sessionId: sessionId,
@@ -84,7 +193,7 @@ export class TrulyYouReactNativeSDK {
         returnUrl: returnUrl
       })
       
-      const enrollUrl = `${this.frontendUrl}/enroll?${enrollUrlParams.toString()}`
+      const enrollUrl = `${frontendUrl}/enroll?${enrollUrlParams.toString()}`
 
       console.log('[ReactNativeSDK]: Opening Custom Tab for enrollment:', enrollUrl)
 

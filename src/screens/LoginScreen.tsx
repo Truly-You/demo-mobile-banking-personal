@@ -138,21 +138,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, enrollmentKeyId, sho
       console.log('[LoginScreen]: API URL:', apiUrl);
       console.log('[LoginScreen]: Auth App ID:', authAppId);
       
-      // Fetch frontend URL and callback scheme from config API
-      console.log('[LoginScreen]: Fetching config from API...');
-      const frontendUrl = await configService.getSdkFrontendUrl(apiUrl);
-      const deepLinkScheme = await configService.getMobileAppCallback(apiUrl);
-      console.log('[LoginScreen]: Frontend URL from config:', frontendUrl);
-      console.log('[LoginScreen]: Deep link scheme from config:', deepLinkScheme);
-      
-      // Create a temporary SDK instance just for enrollment
+      // Create SDK instance - it will fetch frontendUrl and deepLinkScheme automatically from backend
       // We use a dummy keyId since it's not used for enrollment
       const sdk = new TrulyYouReactNativeSDK({
         apiUrl,
-        frontendUrl,
         authAppId,
-        keyId: 'dummy-for-enrollment',
-        deepLinkScheme
+        keyId: 'dummy-for-enrollment'
       });
       
       await sdk.startEnrollment();
