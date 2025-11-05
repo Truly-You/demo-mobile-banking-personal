@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,17 +8,21 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
+  AppState,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from 'react-native-config';
 import { TrulyYouReactNativeSDK } from '../sdk/TrulyYouReactNativeSDK';
+import { configService } from '../services/ConfigService';
 
 interface LoginScreenProps {
   onLogin: (username?: string) => void;
   enrollmentKeyId: string | null; // Passed from App when enrollment completes
+  shouldAutoTrigger: boolean; // Whether to auto-trigger authentication on mount
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, enrollmentKeyId }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, enrollmentKeyId, shouldAutoTrigger }) => {
   const [loginMode, setLoginMode] = useState<'authenticate' | 'legacy'>('authenticate');
   const [showPin, setShowPin] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -28,23 +32,43 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, enrollmentKeyId }) =
   const [showFAQ, setShowFAQ] = useState(false);
   const [keyId, setKeyId] = useState('');
   const [storedKeyId, setStoredKeyId] = useState<string | null>(null);
+  const [hasUserDismissed, setHasUserDismissed] = useState(false);
+  const [hasAutoTriggered, setHasAutoTriggered] = useState(false);
+  const appState = useRef(AppState.currentState);
+  const mountTime = useRef(Date.now());
 
-  // Load stored keyId from AsyncStorage on mount
+  // Load stored keyId from AsyncStorage on mount and auto-trigger if appropriate
   useEffect(() => {
-    const loadStoredKeyId = async () => {
+    const loadStoredKeyIdAndAutoLogin = async () => {
       try {
         const stored = await AsyncStorage.getItem('passkeyKeyId');
         console.log('[LoginScreen]: Loaded keyId from AsyncStorage:', stored);
         setStoredKeyId(stored);
         if (stored) {
           setKeyId(stored); // Pre-fill the keyId input
+          
+          // Check if we just logged out (within last 2 seconds)
+          const lastLogoutTimeStr = await AsyncStorage.getItem('lastLogoutTime');
+          const lastLogoutTime = lastLogoutTimeStr ? parseInt(lastLogoutTimeStr) : 0;
+          const timeSinceLogoutMs = Date.now() - lastLogoutTime;
+          
+          if (timeSinceLogoutMs < 2000) {
+            console.log('[LoginScreen]: Recently logged out, skipping auto-trigger on mount');
+            return;
+          }
+          
+          // Auto-trigger if conditions are met
+          if (shouldAutoTrigger && !hasUserDismissed && loginMode === 'authenticate') {
+            console.log('[LoginScreen]: Auto-triggering authentication on mount with keyId:', stored);
+            performAuthentication(stored);
+          }
         }
       } catch (error) {
         console.error('[LoginScreen]: Failed to load keyId from AsyncStorage:', error);
       }
     };
 
-    loadStoredKeyId();
+    loadStoredKeyIdAndAutoLogin();
   }, []);
 
   // React to enrollment completion
@@ -53,8 +77,44 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, enrollmentKeyId }) =
       console.log('[LoginScreen]: Enrollment completed with keyId:', enrollmentKeyId);
       setStoredKeyId(enrollmentKeyId);
       setKeyId(enrollmentKeyId);
+      
+      // Reset auto-trigger flag so it triggers again after enrollment
+      setHasAutoTriggered(false);
+      setHasUserDismissed(false);
+      
+      // Auto-trigger login after enrollment with the new keyId directly
+      console.log('[LoginScreen]: Auto-triggering authentication after enrollment with keyId:', enrollmentKeyId);
+      performAuthentication(enrollmentKeyId);
     }
   }, [enrollmentKeyId]);
+
+  // Listen for app state changes (background -> foreground)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      // Detect when app comes back to foreground
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('[LoginScreen]: App came to foreground');
+        console.log('[LoginScreen]: shouldAutoTrigger:', shouldAutoTrigger, 'hasUserDismissed:', hasUserDismissed, 'keyId:', keyId);
+        
+        // Reset dismissal flag when coming from background - user might want to authenticate after backgrounding
+        setHasUserDismissed(false);
+        
+        // Auto-trigger authentication if enabled and keyId exists
+        if (shouldAutoTrigger && !isAuthenticating && keyId && loginMode === 'authenticate') {
+          console.log('[LoginScreen]: Auto-triggering authentication on app resume with keyId:', keyId);
+          performAuthentication(keyId);
+        } else {
+          console.log('[LoginScreen]: Not auto-triggering. Reason:', !shouldAutoTrigger ? 'shouldAutoTrigger=false' : !keyId ? 'no keyId' : isAuthenticating ? 'already authenticating' : 'wrong mode');
+        }
+      }
+      
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [shouldAutoTrigger, hasUserDismissed, isAuthenticating, keyId, loginMode]);
 
   const toggleLoginMode = () => {
     setLoginMode(loginMode === 'authenticate' ? 'legacy' : 'authenticate');
@@ -64,14 +124,26 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, enrollmentKeyId }) =
     setIsEnrolling(true);
     
     try {
-      const apiUrl = Config.TRULYYOU_API_URL || 'https://api.dev.ng.truly.you';
-      const frontendUrl = Config.TRULYYOU_FRONTEND_URL || 'https://dev.ng.truly.you';
-      const authAppId = Config.TRULYYOU_AUTH_APP_ID || '68ffc3b61f30b67a3fae716e';
+      const apiUrl = Config.TRULYYOU_API_URL;
+      const authAppId = Config.TRULYYOU_AUTH_APP_ID;
+      
+      if (!apiUrl) {
+        throw new Error('TRULYYOU_API_URL is not set in environment configuration');
+      }
+      if (!authAppId) {
+        throw new Error('TRULYYOU_AUTH_APP_ID is not set in environment configuration');
+      }
       
       console.log('[LoginScreen]: Starting passkey enrollment...');
       console.log('[LoginScreen]: API URL:', apiUrl);
-      console.log('[LoginScreen]: Frontend URL:', frontendUrl);
       console.log('[LoginScreen]: Auth App ID:', authAppId);
+      
+      // Fetch frontend URL and callback scheme from config API
+      console.log('[LoginScreen]: Fetching config from API...');
+      const frontendUrl = await configService.getSdkFrontendUrl(apiUrl);
+      const deepLinkScheme = await configService.getMobileAppCallback(apiUrl);
+      console.log('[LoginScreen]: Frontend URL from config:', frontendUrl);
+      console.log('[LoginScreen]: Deep link scheme from config:', deepLinkScheme);
       
       // Create a temporary SDK instance just for enrollment
       // We use a dummy keyId since it's not used for enrollment
@@ -80,7 +152,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, enrollmentKeyId }) =
         frontendUrl,
         authAppId,
         keyId: 'dummy-for-enrollment',
-        deepLinkScheme: 'nairabankapp'
+        deepLinkScheme
       });
       
       await sdk.startEnrollment();
@@ -90,93 +162,116 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, enrollmentKeyId }) =
       
     } catch (error: any) {
       console.error('[LoginScreen]: Enrollment error:', error);
-      alert('Enrollment failed: ' + (error.message || 'Unknown error'));
+      Alert.alert('Enrollment Error', 'Enrollment failed: ' + (error.message || 'Unknown error'));
     } finally {
       setIsEnrolling(false);
     }
   };
 
-  const handleLogin = async () => {
-    // No longer require keyId - we have a fallback
+  // Core authentication function that takes keyId as parameter to avoid race conditions
+  const performAuthentication = async (keyIdToUse: string) => {
     setIsAuthenticating(true);
     
     try {
-      if (loginMode === 'authenticate') {
-        // Use React Native SDK for authentication
-        // Get values from environment variables
-        console.log('[LoginScreen]: Config object:', Config);
-        console.log('[LoginScreen]: Config.TRULYYOU_AUTH_APP_ID:', Config.TRULYYOU_AUTH_APP_ID);
-        console.log('[LoginScreen]: All Config keys:', Object.keys(Config || {}));
-        
-        // Use keyId from input or fallback to hardcoded default
-        const finalKeyId = keyId || 'ZmaJrVuF8hDz-IRQAY093A';
-        console.log('[LoginScreen]: Using keyId:', finalKeyId, keyId ? '(from input)' : '(fallback)');
-        
-        const apiUrl = Config.TRULYYOU_API_URL || 'https://api.dev.ng.truly.you';
-        const backendApiUrl = Config.TRULYYOU_BACKEND_API_URL || 'https://personalbanking-api.demo.truly.you';
-        const authAppId = Config.TRULYYOU_AUTH_APP_ID || '68ffc3b61f30b67a3fae716e'; // Fallback for now
-        
-        console.log('[LoginScreen]: Final authAppId:', authAppId);
-        console.log('[LoginScreen]: API URL:', apiUrl);
-        console.log('[LoginScreen]: Backend URL:', backendApiUrl);
-        
-        if (!authAppId) {
-          throw new Error('TRULYYOU_AUTH_APP_ID is required. Please set it in your .env file.');
-        }
+      console.log('[LoginScreen]: Using keyId:', keyIdToUse);
+      
+      const apiUrl = Config.TRULYYOU_API_URL;
+      const backendApiUrl = (Config as any).NAIRA_BANK_BACKEND_URL;
+      const authAppId = Config.TRULYYOU_AUTH_APP_ID;
+      
+      if (!apiUrl) {
+        throw new Error('TRULYYOU_API_URL is not set in environment configuration');
+      }
+      if (!authAppId) {
+        throw new Error('TRULYYOU_AUTH_APP_ID is not set in environment configuration');
+      }
+      if (!backendApiUrl) {
+        throw new Error('NAIRA_BANK_BACKEND_URL is not set in environment configuration');
+      }
+      
+      console.log('[LoginScreen]: API URL:', apiUrl);
+      console.log('[LoginScreen]: Backend URL:', backendApiUrl);
+      console.log('[LoginScreen]: Auth App ID:', authAppId);
 
-        const sdk = new TrulyYouReactNativeSDK({
-          apiUrl,
-          authAppId,
-          keyId: finalKeyId,
-        });
+      const sdk = new TrulyYouReactNativeSDK({
+        apiUrl,
+        authAppId,
+        keyId: keyIdToUse,
+      });
 
-        const loginUrl = `${backendApiUrl}/api/auth/login`;
-        console.log('[LoginScreen]: Calling fetchWithSignature with URL:', loginUrl);
-        console.log('[LoginScreen]: Using keyId:', finalKeyId);
+      const loginUrl = `${backendApiUrl}/api/auth/login`;
+      console.log('[LoginScreen]: Calling fetchWithSignature with URL:', loginUrl);
+      console.log('[LoginScreen]: Using keyId:', keyIdToUse);
 
-        const result = await sdk.fetchWithSignature(loginUrl, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
+      const result = await sdk.fetchWithSignature(loginUrl, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
 
-        if (!result || !result.response) {
-          console.log('[LoginScreen]: Signature request failed');
-          setIsAuthenticating(false);
-          return;
-        }
+      if (!result || !result.response) {
+        console.log('[LoginScreen]: Signature request failed');
+        setIsAuthenticating(false);
+        return;
+      }
 
-        if (result.response.ok) {
-          const loginData = await result.response.json();
-          console.log('[LoginScreen]: Authentication successful:', loginData);
-          onLogin(loginData.user?.username || 'Demo User');
-        } else {
-          const errorData = await result.response.json();
-          console.error('[LoginScreen]: Authentication failed:', errorData);
-          alert('Authentication failed: ' + (errorData.message || 'Unknown error'));
-          setIsAuthenticating(false);
-        }
+      if (result.response.ok) {
+        const loginData = await result.response.json();
+        console.log('[LoginScreen]: Authentication successful:', loginData);
+        onLogin(loginData.user?.username || 'Demo User');
       } else {
-        // Legacy mode - simulate authentication
-        setTimeout(() => {
-          setIsAuthenticating(false);
-          onLogin('Demo User');
-        }, 1500);
+        const errorData = await result.response.json();
+        console.error('[LoginScreen]: Authentication failed:', errorData);
+        Alert.alert('Authentication Failed', errorData.message || 'Unknown error');
+        setIsAuthenticating(false);
       }
     } catch (error: any) {
-      console.error('[LoginScreen]: Authentication error:', error);
+      // Check if user cancelled - silently fail without alerts or clearing keys
+      const errorMessage = (error.message || '').toLowerCase();
+      const errorCode = error.code || '';
+      const errorString = JSON.stringify(error).toLowerCase();
       
-      // If passkey not found (e.g., user deleted it), clear stored keyId
-      if (error.message && (error.message.includes('Cancelled by user') || error.message.includes('No credentials'))) {
-        console.log('[LoginScreen]: Passkey not found, clearing stored keyId');
-        await AsyncStorage.removeItem('passkeyKeyId');
-        setStoredKeyId(null);
-        setKeyId('');
-        alert('Passkey not found. Please enroll again.');
-      } else {
-        alert('Authentication error: ' + (error.message || 'Unknown error'));
+      const isCancellation = errorMessage.includes('cancelled by user') || 
+                            errorMessage.includes('cancelled') ||
+                            errorMessage.includes('canceled') ||
+                            errorMessage.includes('cancel') ||
+                            errorMessage.includes('operation couldn') || // Catches typos like "opetation"
+                            errorCode === 1001 || // iOS ASAuthorizationError.canceled
+                            errorCode === 'ERR_CANCELED' ||
+                            errorString.includes('error 1001') || // iOS error code in string
+                            errorString.includes('authorizationerror');
+      
+      if (isCancellation) {
+        console.log('[LoginScreen]: User cancelled authentication - silently failing');
+        // Mark as dismissed so it doesn't auto-trigger again
+        setHasUserDismissed(true);
+        // Reset authentication state without alerts or clearing keys
+        setIsAuthenticating(false);
+        return;
       }
       
+      // For actual errors (not cancellations), log and show alert but don't clear keys
+      console.error('[LoginScreen]: Authentication error:', error);
+      Alert.alert('Authentication Error', error.message);
+      setHasUserDismissed(true);
       setIsAuthenticating(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (loginMode === 'authenticate') {
+      if (!keyId) {
+        Alert.alert('No Passkey', 'No keyId found. Please enroll a passkey first.');
+        return;
+      }
+      console.log('[LoginScreen]: Manual login triggered with keyId:', keyId);
+      await performAuthentication(keyId);
+    } else {
+      // Legacy mode - simulate authentication
+      setIsAuthenticating(true);
+      setTimeout(() => {
+        setIsAuthenticating(false);
+        onLogin('Demo User');
+      }, 1500);
     }
   };
 
@@ -348,24 +443,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, enrollmentKeyId }) =
           </TouchableOpacity>
         </View>
         
-        {/* Hidden keyId input in FAQ section */}
-        {showFAQ && (
-          <View style={styles.faqSection}>
-            <Text style={styles.faqTitle}>Developer Settings</Text>
-            <TextInput
-              style={styles.keyIdInput}
-              placeholder="Enter KeyId from passkey"
-              placeholderTextColor="#9CA3AF"
-              value={keyId}
-              onChangeText={setKeyId}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <Text style={styles.faqHint}>
-              Paste the keyId from your passkey configured on dev.ng.truly.you
-            </Text>
-          </View>
-        )}
         
         <Text style={styles.copyright}>
           © 2024 NAIRA BANK PLC (LICENSED BY THE CENTRAL BANK OF NIGERIA) | TERMS & CONDITIONS

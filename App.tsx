@@ -8,6 +8,7 @@ const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | undefined>('');
   const [enrollmentKeyId, setEnrollmentKeyId] = useState<string | null>(null);
+  const [shouldAutoTrigger, setShouldAutoTrigger] = useState(true);
 
   // Handle deep links for enrollment callback
   useEffect(() => {
@@ -46,8 +47,9 @@ const App = () => {
             await AsyncStorage.setItem('passkeyKeyId', keyId);
             console.log('[APP]: keyId saved to AsyncStorage');
             
-            // Update state to trigger re-render of LoginScreen
+            // Update state to trigger re-render of LoginScreen and enable auto-trigger
             setEnrollmentKeyId(keyId);
+            setShouldAutoTrigger(true);
           } catch (error) {
             console.error('[APP]: Failed to save keyId to AsyncStorage:', error);
           }
@@ -73,11 +75,21 @@ const App = () => {
   const handleLogin = (user?: string) => {
     setIsLoggedIn(true);
     setUsername(user || 'Demo User');
+    // Disable auto-trigger after successful login
+    setShouldAutoTrigger(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsLoggedIn(false);
     setUsername(undefined);
+    // Mark logout time to prevent immediate auto-trigger on LoginScreen remount
+    try {
+      await AsyncStorage.setItem('lastLogoutTime', Date.now().toString());
+    } catch (error) {
+      console.error('[APP]: Failed to save logout time:', error);
+    }
+    // Re-enable auto-trigger so user can authenticate when they return from background
+    setShouldAutoTrigger(true);
   };
 
   if (isLoggedIn) {
@@ -90,7 +102,11 @@ const App = () => {
   }
 
   return (
-    <LoginScreen onLogin={handleLogin} enrollmentKeyId={enrollmentKeyId} />
+    <LoginScreen 
+      onLogin={handleLogin} 
+      enrollmentKeyId={enrollmentKeyId}
+      shouldAutoTrigger={shouldAutoTrigger}
+    />
   );
 };
 

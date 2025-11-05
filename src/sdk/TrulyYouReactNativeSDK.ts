@@ -226,13 +226,17 @@ export class TrulyYouReactNativeSDK {
         throw new Error(`Missing required fields: challenge=${!!challenge}, rpId=${!!rpId}`)
       }
 
-      // Don't include allowCredentials - Android discovers passkeys via Digital Asset Links
-      // The real issue is Error 16 AFTER biometric succeeds = challenge validation failure
+      // Include allowCredentials with the specific keyId - this ensures the correct passkey is used
+      // and prevents userHandle mismatch issues with cross-platform passkeys
       const assertionRequest = {
         challenge: challenge, // base64url (no padding) - WebAuthn standard format
         rpId: rpId, // Must match domain where passkey was registered
         timeout: 60000,
-        userVerification: 'required' as const
+        userVerification: 'required' as const,
+        allowCredentials: [{
+          type: 'public-key' as const,
+          id: this.keyId // Use the stored keyId to specify which credential to use
+        }]
       }
 
       // Validate JSON can be stringified
