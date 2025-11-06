@@ -1,74 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { Linking } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Config from 'react-native-config';
+import { TrulyYouReactNativeSDK } from '@truly-you/react-native-sdk';
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | undefined>('');
-  const [enrollmentKeyId, setEnrollmentKeyId] = useState<string | null>(null);
   const [shouldAutoTrigger, setShouldAutoTrigger] = useState(true);
-
-  // Handle deep links for enrollment callback
+  const [sdk, setSdk] = useState<TrulyYouReactNativeSDK | null>(null);
+  const appState = useRef(AppState.currentState);
+  
   useEffect(() => {
-    const handleDeepLink = async (event: { url: string }) => {
-      console.log('[APP]: Deep link received:', event.url);
-      
-      // Check if it's an enrollment success callback
-      if (event.url.startsWith('nairabankapp://enrollment-success')) {
-        // Parse query parameters manually (React Native doesn't have URLSearchParams)
-        const queryString = event.url.split('?')[1];
-        const params: Record<string, string> = {};
-        
-        if (queryString) {
-          queryString.split('&').forEach(param => {
-            const [key, value] = param.split('=');
-            if (key && value) {
-              params[key] = decodeURIComponent(value);
-            }
-          });
-        }
-        
-        const keyId = params.keyId;
-        const error = params.error;
-        
-        if (error) {
-          console.error('[APP]: Enrollment failed:', error);
-          // TODO: Show error to user
-          return;
-        }
-        
-        if (keyId) {
-          console.log('[APP]: Enrollment successful, saving keyId:', keyId);
-          
-          // Store keyId in AsyncStorage
-          try {
-            await AsyncStorage.setItem('passkeyKeyId', keyId);
-            console.log('[APP]: keyId saved to AsyncStorage');
-            
-            // Update state to trigger re-render of LoginScreen and enable auto-trigger
-            setEnrollmentKeyId(keyId);
-            setShouldAutoTrigger(true);
-          } catch (error) {
-            console.error('[APP]: Failed to save keyId to AsyncStorage:', error);
-          }
-        }
-      }
+    const apiUrl = Config.TRULYYOU_API_URL;
+    const authAppId = Config.TRULYYOU_AUTH_APP_ID;
+    
+    if (!apiUrl || !authAppId) {
+      console.error('[APP]: Missing required environment variables');
+      console.error('[APP]: apiUrl:', apiUrl);
+      console.error('[APP]: authAppId:', authAppId);
+      return;
+    }
+    
+    // Determine bundleId or packageName based on platform
+    const sdkConfig: any = {
+      apiUrl,
+      authAppId,
     };
-
-    // Listen for deep links when app is already open
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Check if app was opened from a deep link
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
+    
+    if (Platform.OS === 'ios') {
+      sdkConfig.bundleId = 'com.nairabankmobile.company';
+    } else if (Platform.OS === 'android') {
+      sdkConfig.packageName = 'com.nairabankmobile';
+    }
+    
+    console.log('[APP]: Initializing SDK with:', sdkConfig);
+    const sdkInstance = new TrulyYouReactNativeSDK(sdkConfig);
+    setSdk(sdkInstance);
+    console.log('[APP]: SDK initialized and set');
 
     return () => {
-      subscription.remove();
+      // Clean up SDK on unmount
+      if (sdkInstance) {
+        sdkInstance.destroy();
+      }
     };
   }, []);
 
@@ -79,18 +56,44 @@ const App = () => {
     setShouldAutoTrigger(false);
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (isManual: boolean = true) => {
     setIsLoggedIn(false);
     setUsername(undefined);
-    // Mark logout time to prevent immediate auto-trigger on LoginScreen remount
-    try {
-      await AsyncStorage.setItem('lastLogoutTime', Date.now().toString());
-    } catch (error) {
-      console.error('[APP]: Failed to save logout time:', error);
+    // Only set logout time for MANUAL logout to prevent immediate auto-trigger
+    // Auto-logout (bg) should NOT set this, so user can auto-login on fg
+    if (isManual) {
+      try {
+        await AsyncStorage.setItem('lastLogoutTime', Date.now().toString());
+        console.log('[APP]: Manual logout timestamp saved:', Date.now());
+      } catch (error) {
+        console.error('[APP]: Failed to save logout time:', error);
+      }
+    } else {
+      console.log('[APP]: Auto-logout (no timestamp) - will allow auto-trigger on foreground');
     }
-    // Re-enable auto-trigger so user can authenticate when they return from background
+    // Keep auto-trigger enabled for future background-to-foreground transitions
+    // LoginScreen will check lastLogoutTime to prevent immediate re-trigger
     setShouldAutoTrigger(true);
   };
+
+  // Auto-logout when app goes to background
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextAppState) => {
+      // Detect when app goes to background while logged in
+      if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
+        if (isLoggedIn) {
+          console.log('[APP]: App going to background while logged in - auto logout');
+          await handleLogout(false); // Pass false for auto-logout (no timestamp)
+        }
+      }
+      
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isLoggedIn]);
 
   if (isLoggedIn) {
     return (
@@ -104,7 +107,7 @@ const App = () => {
   return (
     <LoginScreen 
       onLogin={handleLogin} 
-      enrollmentKeyId={enrollmentKeyId}
+      sdk={sdk}
       shouldAutoTrigger={shouldAutoTrigger}
     />
   );
