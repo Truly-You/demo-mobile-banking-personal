@@ -9,6 +9,7 @@ import {
   Image,
   AppState,
   Alert,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from 'react-native-config';
@@ -211,12 +212,27 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, sdk, shouldAutoTrigg
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
-        <Image
-          source={require('../assets/nairabank.jpeg')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>Naira Bank</Text>
+        <TouchableOpacity
+          onPress={async () => {
+            if (isEnrolled) {
+              Alert.alert(
+                'Clear Secure Key',
+                'Are you sure you want to clear your secure key? You will need to re-enroll.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Clear', style: 'destructive', onPress: handleLogout }
+                ]
+              );
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Image
+            source={require('../assets/nairabank.jpeg')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
         <Text style={styles.subtitle}>Personal Banking</Text>
       </View>
 
@@ -224,7 +240,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, sdk, shouldAutoTrigg
         {isAuthenticating ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#81e62e" />
-            <Text style={styles.loadingText}>Authenticating with passkey...</Text>
+            <Text style={styles.loadingText}>Authenticating with biometrics...</Text>
           </View>
         ) : (
           <>
@@ -241,21 +257,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, sdk, shouldAutoTrigg
               </Text>
             </TouchableOpacity>
 
-            {isEnrolled && (
-              <TouchableOpacity
-                style={styles.logoutButton}
-                onPress={handleLogout}
-              >
-                <Text style={styles.logoutButtonText}>Clear Passkey & Logout</Text>
-              </TouchableOpacity>
-            )}
-
             <Text style={styles.infoText}>
               {!sdk 
                 ? 'Initializing...'
                 : isEnrolled 
                   ? 'Tap to authenticate using your device biometrics'
-                  : 'Tap to set up secure passkey authentication'
+                  : 'Tap to set up secure biometric authentication'
               }
             </Text>
           </>
@@ -270,27 +277,23 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: '#F3F4F6',
     padding: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 24,
   },
   header: {
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: Platform.OS === 'ios' ? 40 : 20,
     marginBottom: 40,
   },
   logo: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     marginBottom: 16,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
   subtitle: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#6B7280',
+    fontWeight: '500',
   },
   card: {
     backgroundColor: 'white',

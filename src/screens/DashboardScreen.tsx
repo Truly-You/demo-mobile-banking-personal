@@ -5,6 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Image,
+  Platform,
 } from 'react-native';
 
 interface DashboardScreenProps {
@@ -21,9 +23,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ username, onLogout })
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <View style={styles.logo}>
-            <Text style={styles.logoText}>NAIRA BANK</Text>
-          </View>
+          <Image
+            source={require('../assets/nairabank.jpeg')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.headerTitle}>Personal Internet Banking</Text>
         </View>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -98,7 +102,8 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 50 : 16,
+    paddingBottom: 16,
     paddingHorizontal: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -116,17 +121,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   logo: {
-    width: 96,
+    width: 48,
     height: 48,
-    backgroundColor: '#90E93B',
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
+    borderRadius: 24,
   },
   headerTitle: {
     fontSize: 18,
