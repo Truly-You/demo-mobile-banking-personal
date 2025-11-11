@@ -25,9 +25,14 @@ if [ -n "$IOS_DEVICE_ID" ]; then
     
     echo -e "${GREEN}[iOS] Installing...${NC}"
     cd ..
-    xcrun devicectl device install app --device "$IOS_DEVICE_ID" \
-        /Users/roryspies/Library/Developer/Xcode/DerivedData/NairaBankPersonal-bzkizebvyqvjceccafnyxfkezzyc/Build/Products/Debug-iphoneos/NairaBankPersonal.app 2>&1 | grep -E "installed|App"
-    echo -e "${GREEN}[iOS] ✓ Done${NC}\n"
+    # Find the built app dynamically
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/NairaBankPersonal-*/Build/Products/Debug-iphoneos/NairaBankPersonal.app -maxdepth 0 2>/dev/null | head -n 1)
+    if [ -n "$APP_PATH" ]; then
+        xcrun devicectl device install app --device "$IOS_DEVICE_ID" "$APP_PATH" 2>&1 | grep -E "installed|App"
+        echo -e "${GREEN}[iOS] ✓ Done${NC}\n"
+    else
+        echo -e "${RED}[iOS] ✗ Could not find built app${NC}\n"
+    fi
 fi
 
 # Android

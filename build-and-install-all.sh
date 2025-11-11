@@ -70,9 +70,15 @@ build_ios() {
         if [ ${PIPESTATUS[0]} -eq 0 ]; then
             echo -e "${GREEN}[iOS] Build successful${NC}"
             echo -e "${YELLOW}[iOS] Installing...${NC}"
-            xcrun devicectl device install app --device "$IOS_DEVICE_ID" \
-                /Users/roryspies/Library/Developer/Xcode/DerivedData/NairaBankPersonal-bzkizebvyqvjceccafnyxfkezzyc/Build/Products/Debug-iphoneos/NairaBankPersonal.app
-            echo -e "${GREEN}[iOS] ✓ Installed successfully${NC}\n"
+            # Find the built app dynamically
+            APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData/NairaBankPersonal-*/Build/Products/Debug-iphoneos/NairaBankPersonal.app -maxdepth 0 2>/dev/null | head -n 1)
+            if [ -n "$APP_PATH" ]; then
+                xcrun devicectl device install app --device "$IOS_DEVICE_ID" "$APP_PATH"
+                echo -e "${GREEN}[iOS] ✓ Installed successfully${NC}\n"
+            else
+                echo -e "${RED}[iOS] ✗ Could not find built app${NC}\n"
+                return 1
+            fi
         else
             echo -e "${RED}[iOS] Build failed${NC}\n"
             return 1
