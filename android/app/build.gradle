@@ -12,6 +12,12 @@ apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.grad
 def enableProguardInReleaseBuilds = false
 def jscFlavor = 'org.webkit:android-jsc:+'
 
+// Configure React Native to bundle JS for debug builds (standalone APK)
+react {
+    // By default, debug builds skip bundling. Set to empty array to bundle for all variants
+    debuggableVariants = []
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 

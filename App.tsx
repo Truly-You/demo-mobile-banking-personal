@@ -5,12 +5,14 @@ import Config from 'react-native-config';
 import { TrulyYouReactNativeSDK } from '@truly-you/react-native-sdk';
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
+import CardsScreen from './src/screens/CardsScreen';
 
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | undefined>('');
   const [shouldAutoTrigger, setShouldAutoTrigger] = useState(true);
   const [sdk, setSdk] = useState<TrulyYouReactNativeSDK | null>(null);
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'cards'>('dashboard');
   const appState = useRef(AppState.currentState);
   const isNfcReadingRef = useRef(false); // Track NFC reading state to prevent auto-logout
   const isMrzCameraRef = useRef(false); // Track MRZ camera state to prevent auto-logout/login
@@ -105,12 +107,22 @@ const App = () => {
   }, [isLoggedIn]);
 
   if (isLoggedIn) {
+    if (currentScreen === 'cards') {
+      return (
+        <CardsScreen
+          onBack={() => setCurrentScreen('dashboard')}
+          sdk={sdk}
+        />
+      );
+    }
+    
     return (
       <DashboardScreen
         username={username}
         onLogout={handleLogout}
         isNfcReadingRef={isNfcReadingRef}
         isMrzCameraRef={isMrzCameraRef}
+        onNavigateToCards={() => setCurrentScreen('cards')}
       />
     );
   }

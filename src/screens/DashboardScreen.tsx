@@ -24,9 +24,10 @@ interface DashboardScreenProps {
   onLogout: () => void;
   isNfcReadingRef?: React.MutableRefObject<boolean>;
   isMrzCameraRef?: React.MutableRefObject<boolean>;
+  onNavigateToCards?: () => void;
 }
 
-const DashboardScreen: React.FC<DashboardScreenProps> = ({ username, onLogout, isNfcReadingRef, isMrzCameraRef }) => {
+const DashboardScreen: React.FC<DashboardScreenProps> = ({ username, onLogout, isNfcReadingRef, isMrzCameraRef, onNavigateToCards }) => {
   const [nfcAvailable, setNfcAvailable] = useState(false);
   const [reading, setReading] = useState(false);
   const [result, setResult] = useState<any | null>(null);
@@ -268,6 +269,16 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ username, onLogout, i
               Pay your utility bills and other services
             </Text>
           </View>
+
+          {onNavigateToCards && (
+            <TouchableOpacity style={styles.quickActionCard} onPress={onNavigateToCards}>
+              <Text style={styles.quickActionIcon}>💳</Text>
+              <Text style={styles.quickActionTitle}>Cards</Text>
+              <Text style={styles.quickActionText}>
+                Manage your virtual and physical cards
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Recent Activity */}
