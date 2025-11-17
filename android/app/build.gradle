@@ -39,6 +39,7 @@ android {
         resValue "string", "TRULYYOU_API_URL", project.env.get("TRULYYOU_API_URL", "http://10.0.2.2:3003")
         resValue "string", "TRULYYOU_AUTH_APP_ID", project.env.get("TRULYYOU_AUTH_APP_ID", "")
         resValue "string", "TRULYYOU_BACKEND_API_URL", project.env.get("TRULYYOU_BACKEND_API_URL", "https://personalbanking-api.demo.truly.you")
+        resValue "string", "NAIRA_BANK_BACKEND_URL", project.env.get("NAIRA_BANK_BACKEND_URL", "https://personalbanking-api.demo.truly.you")
     }
     signingConfigs {
         debug {

@@ -12,6 +12,8 @@ const App = () => {
   const [shouldAutoTrigger, setShouldAutoTrigger] = useState(true);
   const [sdk, setSdk] = useState<TrulyYouReactNativeSDK | null>(null);
   const appState = useRef(AppState.currentState);
+  const isNfcReadingRef = useRef(false); // Track NFC reading state to prevent auto-logout
+  const isMrzCameraRef = useRef(false); // Track MRZ camera state to prevent auto-logout/login
   
   useEffect(() => {
     const apiUrl = Config.TRULYYOU_API_URL;
@@ -76,20 +78,27 @@ const App = () => {
     setShouldAutoTrigger(true);
   };
 
-  // Auto-logout when app goes to background
+  // Disable auto-logout on Android to avoid NFC/session interruptions taking app to background
+  // Also skip auto-logout if NFC reading is in progress
   useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
     const subscription = AppState.addEventListener('change', async (nextAppState) => {
-      // Detect when app goes to background while logged in
       if (appState.current === 'active' && nextAppState.match(/inactive|background/)) {
         if (isLoggedIn) {
-          console.log('[APP]: App going to background while logged in - auto logout');
-          await handleLogout(false); // Pass false for auto-logout (no timestamp)
+          // Skip auto-logout if NFC reading or MRZ camera is in progress
+          if (isNfcReadingRef.current || isMrzCameraRef.current) {
+            console.log('[APP]: App going to background but NFC/MRZ camera in progress - skipping auto-logout');
+            appState.current = nextAppState;
+            return;
+          }
+          console.log('[APP]: App going to background while logged in - auto logout (iOS only)');
+          await handleLogout(false);
         }
       }
-      
       appState.current = nextAppState;
     });
-
     return () => {
       subscription.remove();
     };
@@ -100,6 +109,8 @@ const App = () => {
       <DashboardScreen
         username={username}
         onLogout={handleLogout}
+        isNfcReadingRef={isNfcReadingRef}
+        isMrzCameraRef={isMrzCameraRef}
       />
     );
   }
@@ -109,6 +120,7 @@ const App = () => {
       onLogin={handleLogin} 
       sdk={sdk}
       shouldAutoTrigger={shouldAutoTrigger}
+      isMrzCameraRef={isMrzCameraRef}
     />
   );
 };

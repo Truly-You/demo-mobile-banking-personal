@@ -19,11 +19,11 @@ ANDROID_PACKAGE_NAME="com.nairabankmobile"
 
 # Check for connected devices
 echo "Checking for connected devices..."
-IOS_CONNECTED=$(xcrun devicectl list devices 2>/dev/null | grep -c "connected" || echo "0")
-ANDROID_CONNECTED=$(adb devices | grep -c "device$" || echo "0")
+IOS_CONNECTED=$(xcrun devicectl list devices 2>/dev/null | grep "connected" | wc -l | tr -d '[:space:]')
+ANDROID_CONNECTED=$(adb devices | grep "device$" | wc -l | tr -d '[:space:]')
 
 # Get the actual iOS device ID from devicectl for installation
-if [ "$IOS_CONNECTED" -gt "0" ]; then
+if [ "$IOS_CONNECTED" -gt 0 ]; then
     IOS_DEVICE_ID=$(xcrun devicectl list devices 2>/dev/null | grep "connected" | awk '{print $3}')
     echo "Detected iOS device ID: $IOS_DEVICE_ID"
 fi
@@ -33,12 +33,12 @@ if [ "$IOS_CONNECTED" = "0" ] && [ "$ANDROID_CONNECTED" = "0" ]; then
     exit 1
 fi
 
-echo -e "iOS device: $([ "$IOS_CONNECTED" -gt "0" ] && echo "${GREEN}Connected${NC}" || echo "${RED}Not connected${NC}")"
-echo -e "Android device: $([ "$ANDROID_CONNECTED" -gt "0" ] && echo "${GREEN}Connected${NC}" || echo "${RED}Not connected${NC}")\n"
+echo -e "iOS device: $([ "$IOS_CONNECTED" -gt 0 ] && echo "${GREEN}Connected${NC}" || echo "${RED}Not connected${NC}")"
+echo -e "Android device: $([ "$ANDROID_CONNECTED" -gt 0 ] && echo "${GREEN}Connected${NC}" || echo "${RED}Not connected${NC}")\n"
 
 # Function to uninstall iOS app
 uninstall_ios() {
-    if [ "$IOS_CONNECTED" -gt "0" ]; then
+    if [ "$IOS_CONNECTED" -gt 0 ]; then
         echo -e "${YELLOW}[iOS] Uninstalling old app...${NC}"
         xcrun devicectl device uninstall app --device "$IOS_DEVICE_ID" "$IOS_BUNDLE_ID" 2>&1 | grep -v "Error: The app is not installed" || true
         echo -e "${GREEN}[iOS] Old app removed${NC}\n"
@@ -47,7 +47,7 @@ uninstall_ios() {
 
 # Function to uninstall Android app
 uninstall_android() {
-    if [ "$ANDROID_CONNECTED" -gt "0" ]; then
+    if [ "$ANDROID_CONNECTED" -gt 0 ]; then
         echo -e "${YELLOW}[Android] Uninstalling old app...${NC}"
         adb uninstall "$ANDROID_PACKAGE_NAME" 2>&1 | grep -v "Failure" || true
         echo -e "${GREEN}[Android] Old app removed${NC}\n"
@@ -56,7 +56,7 @@ uninstall_android() {
 
 # Function to build and install iOS
 build_ios() {
-    if [ "$IOS_CONNECTED" -gt "0" ]; then
+    if [ "$IOS_CONNECTED" -gt 0 ]; then
         echo -e "${YELLOW}[iOS] Building...${NC}"
         cd ios
         # Note: xcodebuild uses UDID format, devicectl uses UUID format
@@ -91,17 +91,47 @@ build_ios() {
 
 # Function to build and install Android
 build_android() {
-    if [ "$ANDROID_CONNECTED" -gt "0" ]; then
+    if [ "$ANDROID_CONNECTED" -gt 0 ]; then
         echo -e "${YELLOW}[Android] Building...${NC}"
         cd android
-        ./gradlew assembleRelease --warning-mode none 2>&1 | grep -E "(BUILD|Task :app)" | tail -10
-        
-        if [ ${PIPESTATUS[0]} -eq 0 ]; then
-            echo -e "${GREEN}[Android] Build successful${NC}"
-            echo -e "${YELLOW}[Android] Installing...${NC}"
-            cd ..
-            adb install -r android/app/build/outputs/apk/release/app-release.apk
-            echo -e "${GREEN}[Android] ✓ Installed successfully${NC}\n"
+        # Use Debug for dev server; respect RN_PORT if provided, default 8081
+        RN_PORT_VAL=${RN_PORT:-8081}
+        # Capture full logs (no grep filtering) and also write to a log file one directory up
+        LOG_FILE="../android_build.log"
+        echo -e "${YELLOW}[Android] Gradle logs -> $LOG_FILE${NC}"
+        set -o pipefail
+        # Ensure gradle wrapper exists, otherwise try to generate it or fallback to system gradle
+        if [ ! -f "./gradlew" ]; then
+            echo -e "${YELLOW}[Android] gradlew not found. Attempting to generate wrapper...${NC}"
+            if command -v gradle >/dev/null 2>&1; then
+                gradle wrapper --gradle-version 8.6 --no-daemon || true
+                if [ -f "./gradlew" ]; then
+                    chmod +x ./gradlew
+                    echo -e "${GREEN}[Android] gradle wrapper generated${NC}"
+                else
+                    echo -e "${YELLOW}[Android] Could not generate gradle wrapper. Will use system gradle if available.${NC}"
+                fi
+            else
+                echo -e "${RED}[Android] Neither ./gradlew nor system 'gradle' found. Please install Gradle (brew install gradle) or restore gradle wrapper files.${NC}"
+                set +o pipefail
+                cd ..
+                return 1
+            fi
+        fi
+
+        if [ -f "./gradlew" ]; then
+            ./gradlew clean installDebug -PreactNativeDevServerPort="$RN_PORT_VAL" --stacktrace --warning-mode all --console=plain 2>&1 | tee "$LOG_FILE"
+            GRADLE_STATUS=${PIPESTATUS[0]}
+        else
+            echo -e "${YELLOW}[Android] Using system gradle...${NC}"
+            gradle clean installDebug -PreactNativeDevServerPort="$RN_PORT_VAL" --stacktrace --warning-mode all 2>&1 | tee "$LOG_FILE"
+            GRADLE_STATUS=${PIPESTATUS[0]}
+        fi
+        GRADLE_STATUS=${PIPESTATUS[0]}
+        set +o pipefail
+
+        if [ $GRADLE_STATUS -eq 0 ]; then
+            echo -e "${GREEN}[Android] ✓ Debug installed successfully${NC}\n"
         else
             echo -e "${RED}[Android] Build failed${NC}\n"
             cd ..

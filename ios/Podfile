@@ -44,6 +44,9 @@ target 'NairaBankPersonal' do
     # Pods for testing
   end
 
+  # NFC Passport reader (iOS)
+  pod 'NFCPassportReader'
+
   post_install do |installer|
     # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
     react_native_post_install(
@@ -51,5 +54,19 @@ target 'NairaBankPersonal' do
       config[:reactNativePath],
       :mac_catalyst_enabled => false
     )
+    # Ensure TrulyYouReactNativeSDK uses iOS 15.0
+    installer.pods_project.targets.each do |target|
+      if target.name == 'TrulyYouReactNativeSDK'
+        target.build_configurations.each do |config|
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+        end
+      end
+    end
+    # Update main app project deployment target to 15.0
+    installer.pods_project.build_configurations.each do |config|
+      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 15.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      end
+    end
   end
 end

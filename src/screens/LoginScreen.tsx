@@ -19,9 +19,10 @@ interface LoginScreenProps {
   onLogin: (username?: string) => void;
   sdk: TrulyYouReactNativeSDK | null;
   shouldAutoTrigger: boolean;
+  isMrzCameraRef?: React.MutableRefObject<boolean>;
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, sdk, shouldAutoTrigger }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, sdk, shouldAutoTrigger, isMrzCameraRef }) => {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [hasUserDismissed, setHasUserDismissed] = useState(false);
   const hasUserDismissedRef = useRef(false); // Ref for synchronous checks without re-renders
@@ -65,6 +66,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, sdk, shouldAutoTrigg
       // Detect when app comes back to foreground
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         console.log('[LoginScreen]: App came to foreground');
+        
+        // Skip auto-login if MRZ camera is active
+        if (isMrzCameraRef?.current) {
+          console.log('[LoginScreen]: MRZ camera is active - skipping auto-trigger');
+          appState.current = nextAppState;
+          return;
+        }
         
         // Check if recent logout (within 3 seconds)
         const lastLogoutTimeStr = await AsyncStorage.getItem('lastLogoutTime');

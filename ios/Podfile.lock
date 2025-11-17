@@ -15,6 +15,9 @@ PODS:
     - hermes-engine/Pre-built (= 0.73.2)
   - hermes-engine/Pre-built (0.73.2)
   - libevent (2.1.12)
+  - NFCPassportReader (2.1.2):
+    - OpenSSL-Universal (= 1.1.1900)
+  - OpenSSL-Universal (1.1.1900)
   - RCT-Folly (2022.05.16.00):
     - boost
     - DoubleConversion
@@ -1064,6 +1067,9 @@ PODS:
   - RNCAsyncStorage (2.2.0):
     - React-Core
   - SocketRocket (0.6.1)
+  - TrulyYouReactNativeSDK (0.1.4):
+    - NFCPassportReader
+    - React-Core
   - Yoga (1.14.0)
 
 DEPENDENCIES:
@@ -1074,6 +1080,7 @@ DEPENDENCIES:
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - libevent (~> 2.1.12)
+  - NFCPassportReader
   - RCT-Folly (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCT-Folly/Fabric (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCTRequired (from `../node_modules/react-native/Libraries/RCTRequired`)
@@ -1120,12 +1127,15 @@ DEPENDENCIES:
   - React-utils (from `../node_modules/react-native/ReactCommon/react/utils`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
+  - "TrulyYouReactNativeSDK (from `../node_modules/@truly-you/react-native-sdk`)"
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
   trunk:
     - fmt
     - libevent
+    - NFCPassportReader
+    - OpenSSL-Universal
     - SocketRocket
 
 EXTERNAL SOURCES:
@@ -1230,6 +1240,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
+  TrulyYouReactNativeSDK:
+    :path: "../node_modules/@truly-you/react-native-sdk"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
@@ -1242,6 +1254,8 @@ SPEC CHECKSUMS:
   glog: c5d68082e772fa1c511173d6b30a9de2c05a69a2
   hermes-engine: b361c9ef5ef3cda53f66e195599b47e1f84ffa35
   libevent: 4049cae6c81cdb3654a443be001fb9bdceff7913
+  NFCPassportReader: 57c7824f4f5d620ce77eb8beb145a3469f0a7be5
+  OpenSSL-Universal: 84efb8a29841f2764ac5403e0c4119a28b713346
   RCT-Folly: cd21f1661364f975ae76b3308167ad66b09f53f5
   RCTRequired: 9b1e7e262745fb671e33c51c1078d093bd30e322
   RCTTypeSafety: a759e3b086eccf3e2cbf2493d22f28e082f958e6
@@ -1287,8 +1301,9 @@ SPEC CHECKSUMS:
   ReactCommon: 35e3b6a1c75d462acb0155e38e627b98d5bf586b
   RNCAsyncStorage: b44e8a4e798c3e1f56bffccd0f591f674fb9198f
   SocketRocket: f32cd54efbe0f095c4d7594881e52619cfe80b17
+  TrulyYouReactNativeSDK: cd821a16fd2528242833dee0329e7b322d771e62
   Yoga: 13c8ef87792450193e117976337b8527b49e8c03
 
-PODFILE CHECKSUM: 1137cd3ec848d00c678922e391b55cd9d4458482
+PODFILE CHECKSUM: 7b91461019e843dee5981610a92125375fe8f171
 
 COCOAPODS: 1.16.2
