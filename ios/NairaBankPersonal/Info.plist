@@ -35,8 +35,6 @@
 	<true/>
 	<key>NFCReaderUsageDescription</key>
 	<string>Required to read your ePassport via NFC.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Required to scan passport MRZ code with camera.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -44,6 +42,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Required to scan passport MRZ code with camera.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>UILaunchStoryboardName</key>

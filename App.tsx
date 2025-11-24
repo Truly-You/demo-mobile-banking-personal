@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Platform, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from 'react-native-config';
-import { TrulyYouReactNativeSDK } from '@truly-you/react-native-sdk';
+import { TrulyYouReactNativeSDK, TrulyYouOverlay } from '@truly-you/react-native-sdk';
 import LoginScreen from './src/screens/LoginScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import CardsScreen from './src/screens/CardsScreen';
@@ -10,7 +10,7 @@ import CardsScreen from './src/screens/CardsScreen';
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState<string | undefined>('');
-  const [shouldAutoTrigger, setShouldAutoTrigger] = useState(true);
+  const [shouldAutoTrigger, setShouldAutoTrigger] = useState(false); // Temporarily disabled
   const [sdk, setSdk] = useState<TrulyYouReactNativeSDK | null>(null);
   const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'cards'>('dashboard');
   const appState = useRef(AppState.currentState);
@@ -52,6 +52,9 @@ const App = () => {
       }
     };
   }, []);
+
+  // SDK handles deeplinks and NFC scanning UI automatically
+  // No need for custom deeplink handling here
 
   const handleLogin = (user?: string) => {
     setIsLoggedIn(true);
@@ -106,34 +109,35 @@ const App = () => {
     };
   }, [isLoggedIn]);
 
-  if (isLoggedIn) {
-    if (currentScreen === 'cards') {
-      return (
-        <CardsScreen
-          onBack={() => setCurrentScreen('dashboard')}
-          sdk={sdk}
-        />
-      );
-    }
-    
-    return (
-      <DashboardScreen
-        username={username}
-        onLogout={handleLogout}
-        isNfcReadingRef={isNfcReadingRef}
-        isMrzCameraRef={isMrzCameraRef}
-        onNavigateToCards={() => setCurrentScreen('cards')}
-      />
-    );
-  }
-
   return (
-    <LoginScreen 
-      onLogin={handleLogin} 
-      sdk={sdk}
-      shouldAutoTrigger={shouldAutoTrigger}
-      isMrzCameraRef={isMrzCameraRef}
-    />
+    <>
+      {/* SDK-managed overlay for NFC scanning - automatically shows/hides on get-biometric deeplink */}
+      <TrulyYouOverlay />
+      {isLoggedIn ? (
+        currentScreen === 'cards' ? (
+          <CardsScreen
+            onBack={() => setCurrentScreen('dashboard')}
+            sdk={sdk}
+          />
+        ) : (
+          <DashboardScreen
+            username={username}
+            onLogout={handleLogout}
+            isNfcReadingRef={isNfcReadingRef}
+            isMrzCameraRef={isMrzCameraRef}
+            onNavigateToCards={() => setCurrentScreen('cards')}
+            sdk={sdk}
+          />
+        )
+      ) : (
+        <LoginScreen 
+          onLogin={handleLogin} 
+          sdk={sdk}
+          shouldAutoTrigger={shouldAutoTrigger}
+          isMrzCameraRef={isMrzCameraRef}
+        />
+      )}
+    </>
   );
 };
 

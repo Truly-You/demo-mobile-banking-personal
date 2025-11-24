@@ -354,6 +354,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontSize: 14,
     lineHeight: 20,
+    marginBottom: 16,
   },
 });
 

@@ -1066,9 +1066,20 @@ PODS:
     - React-perflogger (= 0.73.2)
   - RNCAsyncStorage (2.2.0):
     - React-Core
+  - RNReanimated (3.6.3):
+    - glog
+    - RCT-Folly (= 2022.05.16.00)
+    - React-Core
+    - ReactCommon/turbomodule/core
   - SocketRocket (0.6.1)
   - TrulyYouReactNativeSDK (0.1.4):
-    - NFCPassportReader
+    - NFCPassportReader (~> 2.1.2)
+    - React-Core
+  - VisionCamera (4.7.3):
+    - VisionCamera/Core (= 4.7.3)
+    - VisionCamera/React (= 4.7.3)
+  - VisionCamera/Core (4.7.3)
+  - VisionCamera/React (4.7.3):
     - React-Core
   - Yoga (1.14.0)
 
@@ -1080,7 +1091,6 @@ DEPENDENCIES:
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - libevent (~> 2.1.12)
-  - NFCPassportReader
   - RCT-Folly (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCT-Folly/Fabric (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCTRequired (from `../node_modules/react-native/Libraries/RCTRequired`)
@@ -1127,7 +1137,9 @@ DEPENDENCIES:
   - React-utils (from `../node_modules/react-native/ReactCommon/react/utils`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
+  - RNReanimated (from `../node_modules/react-native-reanimated`)
   - "TrulyYouReactNativeSDK (from `../node_modules/@truly-you/react-native-sdk`)"
+  - VisionCamera (from `../node_modules/react-native-vision-camera`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -1240,8 +1252,12 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
+  RNReanimated:
+    :path: "../node_modules/react-native-reanimated"
   TrulyYouReactNativeSDK:
     :path: "../node_modules/@truly-you/react-native-sdk"
+  VisionCamera:
+    :path: "../node_modules/react-native-vision-camera"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
@@ -1300,10 +1316,12 @@ SPEC CHECKSUMS:
   React-utils: dd1e04ea7105dc58637939b50f1a74a5dd634ec4
   ReactCommon: 35e3b6a1c75d462acb0155e38e627b98d5bf586b
   RNCAsyncStorage: b44e8a4e798c3e1f56bffccd0f591f674fb9198f
+  RNReanimated: caa9c5eb308ba5b63f07c254949f2b8bfc1227b5
   SocketRocket: f32cd54efbe0f095c4d7594881e52619cfe80b17
-  TrulyYouReactNativeSDK: cd821a16fd2528242833dee0329e7b322d771e62
+  TrulyYouReactNativeSDK: 9a3684d7f888bf0ce8c895165219a55db4b3dc22
+  VisionCamera: 7187b3dac1ff3071234ead959ce311875748e14f
   Yoga: 13c8ef87792450193e117976337b8527b49e8c03
 
-PODFILE CHECKSUM: 7b91461019e843dee5981610a92125375fe8f171
+PODFILE CHECKSUM: fdc174d2f7ac43c83324af63f96012c8c3c478ec
 
 COCOAPODS: 1.16.2
