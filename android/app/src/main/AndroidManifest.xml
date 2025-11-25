@@ -42,6 +42,13 @@
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="nairabankapp" android:host="get-biometric" />
         </intent-filter>
+        <!-- Deep link for extract_build (web extract) -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="nairabankapp" android:host="extract_build" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>
